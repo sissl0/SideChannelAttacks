@@ -1,0 +1,17 @@
+# started on Sat Oct 25 17:21:15 2025
+
+
+ Performance counter stats for 'taskset -c 0 ./exercise_probe_close':
+
+        81,686,387      cache-misses                     #   80.58% of all cache refs         
+       101,368,267      cache-references                                                      
+    12,815,634,809      L1-dcache-loads                                                       
+         7,437,815      L1-dcache-load-misses            #    0.06% of all L1-dcache accesses 
+         8,072,577      ex_div_busy                                                           
+
+      20.020187627 seconds time elapsed
+
+      12.703633000 seconds user
+       7.314213000 seconds sys
+
+
