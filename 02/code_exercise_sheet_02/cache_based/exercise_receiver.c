@@ -19,9 +19,8 @@
 //    sets rdtsc_t to the duration of the memory access (in cpu cycles)
 
 // Number of samples per measuring interval
-#define NUMBER_SAMPLES (100ul)
-// Predefined threshold (that is used if the user does not define one)
-#define predefined_threshold 200
+#define NUMBER_SAMPLES (1ul) // Prime+Probe: 1 Probe-Summe pro Slot reicht
+#define predefined_threshold 3000 // Summe über EVSET_LEN Zugriffe (anpassbar)
 
 
 int comp_uint64_t(const void* x, const void* y) {
@@ -39,94 +38,70 @@ static void* get_f_at_got(void* f_at_plt) {
   return NULL;
 }
 
+uint64_t now_us() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return 1000000ull * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec;
+}
+
 int main(int argc, char** argv) {
   // Needed by the macro maccess
   uint64_t rdtsc_a1, rdtsc_d1, rdtsc_a2, rdtsc_d2, rdtsc_t;
 
-  // Lib laden/finden und echte Symboladresse holen (nicht PLT)
+  // Prime+Probe-Parameter
+  const uint64_t interval_len = 200; // µs: größer für stabilere Ausrichtung
+  const size_t LINE_SIZE = 64, L1_NUM_SETS = 64, STRIDE = 4096, EVSET_LEN = 16;
+
+  // Adresse aus libdummy holen
   void* handle = dlopen("libdummy.so", RTLD_NOLOAD | RTLD_LAZY);
   if (!handle) handle = dlopen("libdummy.so", RTLD_LAZY);
-  if (!handle) {
-    fprintf(stderr, "dlopen libdummy.so failed: %s\n", dlerror());
-    return 1;
-  }
   void* adr = dlsym(handle, "nopper");
-  if (!adr) {
-    fprintf(stderr, "dlsym nopper failed: %s\n", dlerror());
-    return 1;
+
+  // Gemeinsamer Set: Bits 6..11 übernehmen
+  size_t offset_in_page = (((uintptr_t)adr & 0xFFFu) & ~((uintptr_t)(LINE_SIZE - 1)));
+
+  // Eviction-Set anlegen, das diesen Set trifft
+  void* buf = NULL;
+  if (posix_memalign(&buf, 4096, STRIDE * (EVSET_LEN + 1)) != 0) {
+    fprintf(stderr, "alloc failed\n"); return 1;
   }
-  Dl_info info = {0};
-  if (dladdr(adr, &info) && info.dli_fname) {
-    fprintf(stderr, "lib addr=%p from %s\n", adr, info.dli_fname);
-  }
-  
-  // Variables used by the sampling
-  uint64_t samples[NUMBER_SAMPLES];
-  uint64_t num_miss = 0;
-  uint64_t num_hit = 0;
-  
-  // Variables used for a single measuring interval
+  volatile unsigned char* base = (volatile unsigned char*)buf + offset_in_page;
+  void* evset[16];
+  for (size_t i = 0; i < EVSET_LEN; ++i) evset[i] = (void*)(base + i * STRIDE);
+
+  // Threshold konfigurieren (Summe über EVSET_LEN maccess-Zeiten)
+  uint64_t threshold = (argc > 1) ? (uint64_t)strtoull(argv[1], NULL, 10) : predefined_threshold;
+
+  // Zähler/Timer
+  uint64_t num_miss = 0, num_hit = 0;
   struct timeval tv;
-  uint64_t interval_len = 50; // Microseconds, that a single measuring interval should take
-  uint64_t t_0 = 0;
-  uint64_t t_1 = 0;
-  
-  // User defined threshold (or predefined threshold)
-  uint64_t threshold = 0;
-  if (argc > 1) {
-    threshold = atoi(argv[1]) >= 0 ? (uint64_t)(atoi(argv[1])) : 0;
-  } else {
-    threshold = predefined_threshold;
-  }
-  
-  
+  uint64_t t_0 = 0, t_1 = 0;
+
+  uint64_t slot_idx = 0;
+  uint64_t t_base = now_us() + 200; // gleiche Guard wie beim Sender (Receiver zuerst starten)
   while (1) {
-    //
-    // MEASURE CACHE TIMINGS
-    //
-    
-    //
-    // Reset Counter and start interval-timer (which is not used in measuring the cache timings)
-    //
-    gettimeofday(&tv,NULL);
-    t_0 = 1000000l * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec;
-    
-    //
-    // Approximate the median duration by sampling
-    //
-    for(uint64_t i = 0; i < NUMBER_SAMPLES; ++i) {
-      maccess(adr);
-      samples[i] = rdtsc_t;
+    uint64_t t_start = t_base + slot_idx * interval_len;
+    while (now_us() < t_start) { __asm__ __volatile__("pause"); }
+
+    // PRIME
+    for (size_t r = 0; r < 8; ++r) {
+      for (size_t i = 0; i < EVSET_LEN; ++i) { (void)*(volatile unsigned char*)evset[i]; }
     }
-    
-    
-    //
-    // EVALUATE MEASURES
-    //
-    // Compute Median
-    qsort(samples, NUMBER_SAMPLES, sizeof(uint64_t), comp_uint64_t);
-    // Use (weighted) Median and minimum to determine hits and misses
-    num_hit  += (samples[NUMBER_SAMPLES/2] <= threshold);
-    num_miss += (samples[NUMBER_SAMPLES/2] >  threshold);
-    
-    
-    //
-    // WAIT TILL THE MEASURING INTERVAL ENDS
-    //
-    // Get Time in microseconds and wait if needed.
-    gettimeofday(&tv,NULL);
-    t_1 = 1000000l * (uint64_t)tv.tv_sec + (uint64_t)tv.tv_usec;
-    if ( t_0 + interval_len > t_1 ) { // Handle overflows correctly
-      usleep( (__useconds_t) (interval_len - t_1 + t_0 ));
+
+    // kurze Pause
+    __asm__ __volatile__("pause");
+
+    // PROBE: Summiere Latenzen über Eviction-Set
+    uint64_t sum_cycles = 0;
+    for (size_t i = 0; i < EVSET_LEN; ++i) {
+      maccess(evset[i]);
+      sum_cycles += rdtsc_t;
     }
-    
-    
-    //
-    // PRINT STATUS INFO
-    //
-    if ((num_hit + num_miss) % 1000 == 0) {
-      printf("Hits: %lu   Misses: %lu   Some Duration %lu   \r", num_hit, num_miss, samples[NUMBER_SAMPLES/2]);
-      fflush(stdout);
-    }
+
+    int evicted = (sum_cycles >= threshold);
+    putchar(evicted ? '1' : '0');
+    fflush(stdout);
+
+    ++slot_idx;
   }
 }

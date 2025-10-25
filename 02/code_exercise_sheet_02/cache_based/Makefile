@@ -11,7 +11,7 @@ CFLAGS        := -std=gnu11 -DPROJECT_VERSION='"$(PROJECT_VERSION)"' \
  -Wdouble-promotion -Wformat=2 -Wno-strict-prototypes -g
 INCL          := -I./include
 EXT           := cpp
-LIBS          := -L./lib -ldummy -Wl,-zlazy,-rpath,./lib
+LIBS          := -L./lib -ldummy -ldl -Wl,-zlazy,-rpath,./lib
 
 # Set debug flag or optimize
 ifdef ENABLE_DEBUG
