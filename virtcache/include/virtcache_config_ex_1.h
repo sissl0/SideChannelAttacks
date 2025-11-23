@@ -2,9 +2,9 @@
 // Cacheconfig
 //
 // Duration of a load if the cache is loaded (and the tags agree)
-#define VC_LOAD_CACHED_DURATION     10000UL
+#define VC_LOAD_CACHED_DURATION     40000UL
 // Duration of a load if the cache is invalid
-#define VC_LOAD_CLEAN_DURATION     100000UL
+#define VC_LOAD_CLEAN_DURATION     70000UL
 // Duration of a load if the cache is not invvalid (but the tags do not agree)
 #define VC_LOAD_UNCACHED_DURATION  100000UL
 // Duration of a flush if the cache is invalidated
