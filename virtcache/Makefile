@@ -30,6 +30,8 @@ prog:
 	$(CC) $(CFLAGS) $(INCL) src/main_flush.c -o flush  $(LIBS)
 	$(CC) $(CFLAGS) $(INCL) exercise_1_victim.c -o exercise_1_victim $(LIBS)
 	$(CC) $(CFLAGS) $(INCL) exercise_1_attacker.c -o exercise_1_attacker $(LIBS)
+	$(CC) $(CFLAGS) $(INCL) sender.c -o sender $(LIBS)
+	$(CC) $(CFLAGS) $(INCL) receiver.c -o receiver $(LIBS)
 
 .PHONY: clean
 clean:

@@ -51,7 +51,7 @@ int main(void) {
   long fast = fast_sum / calib_runs;
   long threshold = (slow + fast) / 2;
   printf("# calib fast=%ld slow=%ld threshold=%ld\n", fast, slow, threshold);
-  printf("# Bitte jetzt Victim starten (innerhalb 3s)!\n");
+  printf("# Start Victim (within 3s) !\n");
 
   timespec_get(&tstart, TIME_UTC);
   tstart.tv_nsec = 0;
