@@ -7,38 +7,42 @@
 #include <error.h>
 #include <signal.h>
 
-// The program pretty prints the cache.
+void initialize_library(void);
+void finalize_library(void);
+cacheline_t developer_function_get_cacheline(size_t index);
 
+void pretty_print_cache() {
+  printf("Virtcache Viewer (Fully Associative)\n");
+  printf("------------------------------------------------------------\n");
+  printf(" Slot  |       Tag        | Flags | Data (Hex) | Data (Char)\n");
+  printf("-------+------------------+-------+------------+------------\n");
 
-#define getflagbit(f,i) (((f) & (1<<i)) >> i)
-
-
-void pretty_print_cache(void) {
-  cacheline_t c;
-  printf(
-    "Virtual Cache Belegung\n"
-    "\n"
-    "+--------+--------------------+----------+-----------+\n"
-    "+ Offset |        Tag         |   Flags  |  Belegung |\n");
-  for (unsigned int i = VC_SIZE; i-- > 0 ;) {
-    c = developer_function_get_cacheline(i);
-    printf("+--------+--------------------+----------+-----------+\n");
-    printf("|   0x%02x | 0x%016"PRIx64" |        %u |      0x%02X |\n", i, c.tag, getflagbit(c.flags,0), c.data);
+  for (size_t i = 0; i < VC_SIZE; ++i) {
+    cacheline_t line = developer_function_get_cacheline(i);
+    
+    printf(" %5zu | %16lx |   %d   |     %02x     |      %c\n", 
+           i, 
+           line.tag, 
+           line.flags, 
+           line.data, 
+           (line.data >= 32 && line.data <= 126) ? line.data : '.');
   }
-  printf("+--------+--------------------+----------+-----------+");
+  printf("------------------------------------------------------------\n");
 }
-
 
 void clear_printed_cache(void) {
-  printf("\r\033[20A");
+  // Move cursor up by: 4 header lines + VC_SIZE data lines + 1 footer line
+  printf("\r\033[%zuA", VC_SIZE + 5);
 }
 
-
 int main(void) {
+  initialize_library();
   pretty_print_cache();
   while(1) {
     usleep(10000); // Wait 10 milliseconds
     clear_printed_cache();
     pretty_print_cache();
   }
+  finalize_library();
 }
+
