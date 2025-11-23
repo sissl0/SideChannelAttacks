@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdio.h>
 
 // We assert, that the starting time is of the form (n*3,0).
 // Moreover, we assume that the starting time is in the past.
@@ -33,6 +34,9 @@ void wait_till_next_three_seconds(struct timespec* tstart_p) {
 int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
   
+  // Initialize the cache library
+  initialize_library();
+
   char* key = "1101011001011";
   void* shm_adr = (void*)0x7;
   
@@ -41,17 +45,17 @@ int main(void) {
   timespec_get(&tstart, TIME_UTC);
   tstart.tv_nsec = 0;
   tstart.tv_sec = (tstart.tv_sec/3) * 3;
-  
-  
+
   for (size_t i = 0; i < strlen(key); ++i) {
     wait_till_next_three_seconds(&tstart);
     if (key[i] == '1') {
       read_from_cached_shm(shm_adr);
-      printf("Read\n");
+      printf("Bit %zu: 1\n", i);
     } else {
-      printf("No Read\n");
+      printf("Bit %zu: 0\n", i);
     }
   }
   
+  finalize_library();
   return 0;
 }

@@ -32,6 +32,7 @@ prog:
 	$(CC) $(CFLAGS) $(INCL) exercise_1_attacker.c -o exercise_1_attacker $(LIBS)
 	$(CC) $(CFLAGS) $(INCL) sender.c -o sender $(LIBS)
 	$(CC) $(CFLAGS) $(INCL) receiver.c -o receiver $(LIBS)
+	$(CC) $(CFLAGS) $(INCL) prime_probe_attacker.c -o prime_probe_attacker $(LIBS)
 
 .PHONY: clean
 clean:
