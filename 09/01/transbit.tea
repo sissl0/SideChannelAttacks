@@ -1,1 +1,28 @@
-/home/sisslo/Documents/Uni/SideChannels/teem/demo/transbit.tea
+# Cache-based covert channel - transmit a single bit
+# Using indirect addressing to avoid branch misprediction leaks
+
+# Setup probe addresses in memory
+addi x10, x0, 0x100  # Address to store probe pointers
+addi x1, x0, 0x200   # Probe address for bit = 0
+addi x2, x0, 0x300   # Probe address for bit = 1
+sw x1, 0(x10)        # mem[0x100] = 0x200
+sw x2, 4(x10)        # mem[0x104] = 0x300
+
+# Flush cache
+flushall
+fence
+
+# SECRET BIT TO TRANSMIT: 1
+addi x3, x0, 1       # x3 = secret bit (0 or 1)
+
+# Compute offset: bit * 4
+slli x4, x3, 2       # x4 = secret * 4 (0 or 4)
+
+# Load probe address based on secret
+add x5, x10, x4      # x5 = 0x100 + offset
+lw x6, 0(x5)         # x6 = probe address (0x200 or 0x300)
+
+# Access the probe address - brings it into cache
+lw x7, 0(x6)         # Cache side effect!
+
+# RESULT: Only ONE address in cache reveals the secret bit

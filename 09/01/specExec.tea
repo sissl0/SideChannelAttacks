@@ -1,1 +1,16 @@
-/home/sisslo/Documents/Uni/SideChannels/teem/demo/specExec.tea
+# Minimal speculative execution example
+# Branch 1: Correctly predicted (backward branch - usually predicted taken)
+loop:
+addi x1, x0, 1       # x1 = 1
+beq x0, x0, skip     # Always taken - correctly predicted
+addi x2, x0, 99      # Skipped
+skip:
+
+# Branch 2: Mispredicted (forward branch with false condition)
+addi x3, x0, 0       # x3 = 0  
+beq x3, x1, wrong    # NOT taken (0 != 1), predictor may guess taken
+addi x4, x0, 10      # Correct path
+j end
+wrong:
+addi x5, x0, 77      # Speculative - should rollback
+end:
